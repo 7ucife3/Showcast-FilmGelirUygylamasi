@@ -29,7 +29,7 @@ st.markdown(
 )
 
 # 🎬 Başlık
-st.title("🎬 ShowCast - Film Geliri Tahmini")
+st.title("🎬 ShowCast - Film Geliri Tahmini.")
 
 # 📦 Model ve yardımcıları yükle
 with open("rf_model_bundle.pkl", "rb") as f:
