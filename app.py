@@ -18,6 +18,23 @@ q_high = saved["q_high"]
 
 # 🎬 Uygulama başlığı ve açıklama
 st.set_page_config(page_title="🎬 ShowCast", layout="centered")
+
+
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1504384308090-c894fdcc538d");
+        background-attachment: fixed;
+        background-size: cover;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 st.title("🎬 ShowCast - Film Geliri Tahmini")
 st.markdown("Bu uygulama, verdiğiniz film bilgilerine göre tahmini gişe gelirini hesaplar. Random Forest algoritması kullanılmıştır.")
 
