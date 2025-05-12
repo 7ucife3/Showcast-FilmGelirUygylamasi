@@ -1,63 +1,53 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import json
-from xgboost import XGBRegressor
+import pickle
 
-# 🎯 Modeli yükle
-model = XGBRegressor()
-model.load_model("xgb_model.json")
+# 📦 Kaydedilmiş modeli ve yardımcı nesneleri yükle
+with open("rf_model_bundle.pkl", "rb") as f:
+    saved = pickle.load(f)
 
-# ✅ Özellik adlarını yükle
-with open("feature_names.json", "r") as f:
-    expected_features = json.load(f)
+rf_model = saved["model"]
+le = saved["label_encoder"]
+tfidf = saved["tfidf"]
+q_low = saved["q_low"]
+q_high = saved["q_high"]
 
-# 🎬 Başlık
+# 🎬 Uygulama başlığı ve açıklama
+st.set_page_config(page_title="Film Geliri Tahmini", layout="centered")
 st.title("🎬 Film Geliri Tahmini Uygulaması")
-st.markdown("Aşağıdaki bilgileri girerek filmin tahmini gişe gelirini öğrenebilirsiniz:")
+st.markdown("Bu uygulama, verdiğiniz film bilgilerine göre tahmini gişe gelirini hesaplar. Random Forest algoritması kullanılmıştır.")
 
-# 🔢 Sayısal girişler
-budget = st.number_input("Bütçe ($)", min_value=1000, max_value=500_000_000, step=100000)
-runtime = st.number_input("Süre (dakika)", min_value=30, max_value=300, step=1)
-vote_average = st.slider("Oy Ortalaması", min_value=0.0, max_value=10.0, step=0.1)
-vote_count = st.number_input("Oy Sayısı", min_value=0, max_value=20000, step=100)
+# 🔢 Kullanıcı giriş alanları
+budget = st.number_input("🎯 Bütçe (USD)", min_value=0, step=1000000, value=50000000)
+runtime = st.number_input("🎞️ Süre (dk)", min_value=10, max_value=300, value=120)
+vote_avg = st.slider("⭐ Oy Ortalaması", 0.0, 10.0, value=7.0, step=0.1)
+vote_count = st.number_input("👥 Oy Sayısı", min_value=0, step=1000, value=10000)
+language = st.text_input("🌍 Orijinal Dil (örnek: en)", value="en")
+genres = st.text_input("🎭 Türler (örnek: Action Adventure Sci-Fi)", value="Action Adventure")
 
-release_year = st.number_input("Çıkış Yılı", min_value=1980, max_value=2025, step=1)
-release_month = st.selectbox("Çıkış Ayı", list(range(1, 13)))
-release_day = st.selectbox("Çıkış Günü", list(range(1, 32)))
+# 📌 Tahmin butonu
+if st.button("🎥 Tahmini Geliri Hesapla"):
+    try:
+        # Girdi dönüşümleri
+        budget_log = np.log1p(budget)
+        runtime_winsor = np.clip(runtime, q_low, q_high)
+        vote_count_log = np.log1p(vote_count)
+        language_encoded = le.transform([language])[0]
+        genres_vec = tfidf.transform([genres]).toarray()[0]
+        genres_df = pd.DataFrame([genres_vec], columns=[f"genre_{i}" for i in range(len(genres_vec))])
 
-# 🎭 Kategorik girişler
-main_genre = st.selectbox("Ana Tür", ['Action', 'Comedy', 'Drama', 'Horror', 'Thriller'])
-original_language = st.selectbox("Orijinal Dil", ['en', 'fr', 'es', 'de', 'ja', 'zh'])
+        # Final girdi vektörü
+        input_data = pd.DataFrame([[
+            budget_log, runtime_winsor, vote_avg, vote_count_log, language_encoded
+        ]], columns=['budget_log', 'runtime_winsor', 'vote_average', 'vote_count_log', 'language_encoded'])
 
-# 🚀 Tahmin butonu
-if st.button("Tahmini Hesapla"):
-    log_budget = np.log1p(budget)
+        input_full = pd.concat([input_data.reset_index(drop=True), genres_df], axis=1)
 
-    # Temel veriler
-    input_data = {
-        'log_budget': log_budget,
-        'runtime': runtime,
-        'vote_average': vote_average,
-        'vote_count': vote_count,
-        'release_year': release_year,
-        'release_month': release_month,
-        'release_day': release_day,
-    }
+        # 🔮 Tahmin
+        prediction_log = rf_model.predict(input_full)[0]
+        prediction = np.expm1(prediction_log)
 
-    # Kategorik - dil
-    for lang in ['en', 'fr', 'es', 'de', 'ja', 'zh']:
-        input_data[f'original_language_{lang}'] = 1 if original_language == lang else 0
-
-    # Kategorik - tür
-    for genre in ['Action', 'Comedy', 'Drama', 'Horror', 'Thriller']:
-        input_data[f'main_genre_{genre}'] = 1 if main_genre == genre else 0
-
-    # 🎯 Giriş verisini DataFrame olarak hazırla
-    X_input = pd.DataFrame([input_data], columns=expected_features)
-
-    # 🔍 Tahmin
-    log_revenue_pred = model.predict(X_input)[0]
-    revenue_pred = np.expm1(log_revenue_pred)
-
-    st.success(f"🎯 Tahmini Gişe Geliri: **${revenue_pred:,.0f}**")
+        st.success(f"💰 Tahmini Gişe Geliri: ${prediction:,.0f}")
+    except Exception as e:
+        st.error(f"Hata oluştu: {e}")
