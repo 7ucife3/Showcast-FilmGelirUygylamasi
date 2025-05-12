@@ -14,18 +14,6 @@ q_low = saved["q_low"]
 q_high = saved["q_high"]
 
 
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url("https://images.unsplash.com/photo-1504384308090-c894fdcc538d");
-        background-attachment: fixed;
-        background-size: cover;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 
 # 🎬 Uygulama başlığı ve açıklama
